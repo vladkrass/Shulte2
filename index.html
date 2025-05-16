@@ -2,131 +2,270 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Шульте Таблица</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background: #fff; text-align: center; }
-        .controls { margin: 20px 0; }
-        .board { display: inline-block; margin: 20px auto; }
-        .cell {
-            display: inline-block;
-            width: 50px; height: 50px; margin: 2px;
-            background: #fff; border: 1px solid #000;
-            font-size: 20px; line-height: 50px; cursor: pointer; user-select: none;
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
         }
-        #timer, #record { margin: 10px; font-size: 18px; }
-        button { padding: 5px 15px; }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            margin-bottom: 20px;
+        }
+        .controls label {
+            margin-right: 10px;
+        }
+        .controls select {
+            padding: 5px 10px;
+            font-size: 1em;
+        }
+        .controls button {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: none;
+            border-radius: 10px;
+            background: #77aaff;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .controls button:hover {
+            background: #5599dd;
+        }
+        #game-container {
+            display: grid;
+            gap: 10px;
+            margin: 20px auto;
+            max-width: 100vw;
+            padding: 20px;
+            background: #fdfdfd;
+            border-radius: 15px;
+            box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        }
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            background: #e8f0fe;
+            color: #333;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s, border-radius 0.3s;
+        }
+        .cell:active {
+            transform: scale(0.95);
+        }
+        .cell.correct {
+            background: #77dd77 !important;
+        }
+        .cell.wrong {
+            background: #ff6961 !important;
+        }
+        #timer {
+            font-size: 1.5em;
+            color: #444;
+            transition: transform 0.3s, color 0.3s;
+        }
+        #record, #stats {
+            font-size: 1.2em;
+            color: #555;
+        }
     </style>
 </head>
 <body>
-    <h2>Шульте Таблица</h2>
+    <h1>Шульте Таблица</h1>
     <div class="controls">
-        Размер таблицы:
-        <select id="size">
+        <label for="grid-size">Размер таблицы:</label>
+        <select id="grid-size">
             <option value="4">4x4</option>
-            <option value="5">5x5</option>
+            <option value="5" selected>5x5</option>
             <option value="6">6x6</option>
         </select>
-        &nbsp;&nbsp;
-        Уровень:
-        <select id="level">
+        <br>
+        <label for="difficulty">Уровень:</label>
+        <select id="difficulty">
             <option value="1">1</option>
             <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
         </select>
-        &nbsp;&nbsp;
+        <br><br>
         <button onclick="startGame()">Начать</button>
     </div>
+    <div id="game-container"></div>
     <div id="timer">Время: 0.0 сек</div>
     <div id="record">Рекорд: -</div>
-    <div class="board" id="board"></div>
-    <div id="result" style="margin:15px; font-size:20px; color:green;"></div>
+    <div id="stats"></div>
 
     <script>
-        let size = 4, level = 1, numbers = [], next = 1;
-        let startTime = 0, timerInterval = null, currentTime = 0;
-        let bestTime = null;
+        let currentNumber, errorCount, gridSize, elapsedTime, timerInterval, records = {};
+        const gameContainer = document.getElementById("game-container");
+        const timerElement = document.getElementById("timer");
+        const recordElement = document.getElementById("record");
+        const stats = document.getElementById("stats");
 
-        function shuffle(arr) {
-            for (let i = arr.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [arr[i], arr[j]] = [arr[j], arr[i]];
+        function generateGrid(size) {
+            gridSize = size;
+            const totalCells = size * size;
+            const numbers = Array.from({ length: totalCells }, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+            const difficulty = parseInt(document.getElementById("difficulty").value);
+
+            gameContainer.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            gameContainer.innerHTML = "";
+
+            numbers.forEach((num) => {
+                const cell = document.createElement("div");
+                cell.classList.add("cell");
+                cell.textContent = num;
+                cell.dataset.number = num;
+
+                // Применяем стили в зависимости от уровня сложности
+                applyDifficultyStyles(cell, difficulty);
+
+                cell.onclick = () => checkNumber(cell);
+                gameContainer.appendChild(cell);
+            });
+        }
+
+        function applyDifficultyStyles(cell, difficulty) {
+            const baseStyle = { fontSize: '1.5em', transform: 'rotate(0deg)', backgroundColor: '#e8f0fe' };
+
+            switch (difficulty) {
+                case 1:
+                    // Стандартный стиль
+                    cell.style.fontSize = baseStyle.fontSize;
+                    break;
+                case 2:
+                    // Незначительное изменение размера цифр
+                    cell.style.fontSize = `${Math.random() * (1.8 - 1.3) + 1.3}em`;
+                    break;
+                case 3:
+                    // Незначительное изменение размера и цветов ячеек
+                    cell.style.fontSize = `${Math.random() * (1.8 - 1.3) + 1.3}em`;
+                    cell.style.backgroundColor = `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.2)`;
+                    break;
+                case 4:
+                    // Незначительное изменение размера, цветов и поворота цифр
+                    cell.style.fontSize = `${Math.random() * (1.8 - 1.3) + 1.3}em`;
+                    cell.style.backgroundColor = `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.2)`;
+                    cell.style.transform = `rotate(${Math.random() * 10}deg)`;
+                    break;
+                default:
+                    cell.style.fontSize = baseStyle.fontSize;
+                    break;
             }
         }
 
         function startGame() {
-            size = parseInt(document.getElementById('size').value);
-            level = parseInt(document.getElementById('level').value);
-            const n = size * size;
-            numbers = [];
-            for (let i = 1; i <= n; i++) numbers.push(i);
-            shuffle(numbers);
-            next = 1;
-            drawBoard();
-            document.getElementById('result').textContent = "";
-            startTime = Date.now();
-            currentTime = 0;
-            updateTimer();
-            if (timerInterval) clearInterval(timerInterval);
-            timerInterval = setInterval(updateTimer, 100);
+            const size = parseInt(document.getElementById("grid-size").value);
+            generateGrid(size);
+            currentNumber = 1;
+            errorCount = 0;
+            elapsedTime = 0;
+            updateRecord(size);
+            stats.textContent = "Игра началась! Найдите число 1.";
+            startTimer();
         }
 
-        function drawBoard() {
-            const board = document.getElementById('board');
-            board.innerHTML = '';
-            for (let i = 0; i < numbers.length; i++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                cell.textContent = numbers[i];
-                cell.onclick = function() { clickCell(cell, numbers[i]); };
-                board.appendChild(cell);
-                if ((i + 1) % size === 0) board.appendChild(document.createElement('br'));
-            }
-        }
+        function checkNumber(cell) {
+            const number = parseInt(cell.dataset.number);
+            const difficulty = parseInt(document.getElementById("difficulty").value);
 
-        function clickCell(cell, num) {
-            if (num === next) {
-                cell.style.background = "#eee";
-                next++;
-                if (next > size * size) finishGame();
-            }
-        }
+            if (number === currentNumber) {
+                cell.classList.add("correct");
+                currentNumber++;
+                stats.textContent = `Найдите число ${currentNumber}.`;
 
-        function updateTimer() {
-            if (next > size * size) return;
-            currentTime = (Date.now() - startTime) / 1000;
-            document.getElementById('timer').textContent = "Время: " + currentTime.toFixed(1) + " сек";
-        }
-
-        function finishGame() {
-            if (timerInterval) clearInterval(timerInterval);
-            document.getElementById('result').textContent = "Поздравляем! Ваше время: " + currentTime.toFixed(1) + " сек";
-            updateRecord(currentTime);
-            // --- Только этот блок добавлен для Telegram WebApp ---
-            if (window.Telegram && Telegram.WebApp) {
-                Telegram.WebApp.sendData(currentTime.toFixed(1));
-                Telegram.WebApp.close();
-            }
-            // --- конец блока ---
-        }
-
-        function updateRecord(time) {
-            let key = "shulte_record_" + size + "x" + size + "_lvl" + level;
-            let rec = localStorage.getItem(key);
-            if (!rec || time < parseFloat(rec)) {
-                localStorage.setItem(key, time);
-                bestTime = time;
+                // Если все числа найдены, заканчиваем игру
+                if (currentNumber > gridSize * gridSize) {
+                    stopTimer();
+                    const timeTaken = elapsedTime.toFixed(1);
+                    stats.textContent = `Поздравляем! 
+                    Вы завершили игру за ${timeTaken} сек.`;
+                    updateRecord(gridSize, timeTaken);
+                }
             } else {
-                bestTime = parseFloat(rec);
+                errorCount++;
+                cell.classList.add("wrong");
+                setTimeout(() => cell.classList.remove("wrong"), 500);
+                if (errorCount === 2) {
+                    stats.textContent = "Вы проиграли! Нажмите 'Начать', чтобы попробовать снова.";
+                    stopTimer();
+                    gameContainer.innerHTML = ""; // Очищаем поле
+                } else {
+                    stats.textContent = `Ошибка! Найдите число ${currentNumber}.`;
+                }
             }
-            document.getElementById('record').textContent = "Рекорд: " + (bestTime ? bestTime.toFixed(1) + " сек" : "-");
         }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                elapsedTime += 0.1;
+                timerElement.textContent = `Время: ${elapsedTime.toFixed(1)} сек`;
+
+                if (Math.floor(elapsedTime) % 10 === 0) {
+                    timerElement.style.transform = "scale(1.2)";
+                    timerElement.style.color = "#ff6961";
+                    setTimeout(() => {
+                        timerElement.style.transform = "scale(1)";
+                        timerElement.style.color = "#444";
+                    }, 1000);
+                }
+            }, 100);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        function updateRecord(size, time = null) {
+            if (time) {
+                if (!records[size] || parseFloat(time) < parseFloat(records[size])) {
+                    records[size] = time;
+                }
+            }
+            recordElement.textContent = `Рекорд (${size}x${size}): ${records[size] || "-"} сек`;
+        }
+
+        // --- Локальный leaderboard ---
+        function saveLeaderboard(time) {
+            let key = "shulte_leaderboard_" + size + "x" + size + "_lvl" + level;
+            let lb = JSON.parse(localStorage.getItem(key) || "[]");
+            lb.push({name: playerName, time: time});
+            lb.sort((a, b) => a.time - b.time);
+            if (lb.length > 10) lb = lb.slice(0, 10);
+            localStorage.setItem(key, JSON.stringify(lb));
+        }
+
+        function showLeaderboard() {
+            askNameIfNeeded();
+            let key = "shulte_leaderboard_" + document.getElementById('size').value + "x" + document.getElementById('size').value + "_lvl" + document.getElementById('level').value;
+            let lb = JSON.parse(localStorage.getItem(key) || "[]");
+            let html = "<table><tr><th>Место</th><th>Имя</th><th>Время (сек)</th></tr>";
+            for (let i = 0; i < lb.length; i++) {
+                html += `<tr><td>${i+1}</td><td>${lb[i].name}</td><td>${lb[i].time.toFixed(1)}</td></tr>`;
+            }
+            html += "</table>";
+            if (lb.length === 0) html = "<div>Пока нет рекордов.</div>";
+            document.getElementById('leaderboard').innerHTML = html;
+            document.getElementById('leaderboard').style.display = "block";
+        }
+        // --- конец leaderboard ---
 
         document.getElementById('size').onchange = document.getElementById('level').onchange = function() {
             let key = "shulte_record_" + document.getElementById('size').value + "x" + document.getElementById('size').value + "_lvl" + document.getElementById('level').value;
             let rec = localStorage.getItem(key);
             document.getElementById('record').textContent = "Рекорд: " + (rec ? parseFloat(rec).toFixed(1) + " сек" : "-");
+            document.getElementById('leaderboard').style.display = "none";
         };
 
         window.onload = function() {
