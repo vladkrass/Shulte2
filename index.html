@@ -261,18 +261,7 @@
         }
         // --- конец leaderboard ---
 
-        document.getElementById('size').onchange = document.getElementById('level').onchange = function() {
-            let key = "shulte_record_" + document.getElementById('size').value + "x" + document.getElementById('size').value + "_lvl" + document.getElementById('level').value;
-            let rec = localStorage.getItem(key);
-            document.getElementById('record').textContent = "Рекорд: " + (rec ? parseFloat(rec).toFixed(1) + " сек" : "-");
-            document.getElementById('leaderboard').style.display = "none";
-        };
-
-        window.onload = function() {
-            let key = "shulte_record_" + document.getElementById('size').value + "x" + document.getElementById('size').value + "_lvl" + document.getElementById('level').value;
-            let rec = localStorage.getItem(key);
-            document.getElementById('record').textContent = "Рекорд: " + (rec ? parseFloat(rec).toFixed(1) + " сек" : "-");
-        };
+        
     </script>
 </body>
 </html>
