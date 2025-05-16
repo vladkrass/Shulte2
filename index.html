@@ -79,6 +79,8 @@
             color: #555;
         }
     </style>
+    <!-- Добавляем скрипт Telegram WebApp -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <h1>Шульте Таблица</h1>
@@ -191,6 +193,13 @@
                     stats.textContent = `Поздравляем! 
                     Вы завершили игру за ${timeTaken} сек.`;
                     updateRecord(gridSize, timeTaken);
+
+                    // --- БЛОК ДЛЯ ОТПРАВКИ РЕЗУЛЬТАТА В TELEGRAM WEBAPP ---
+                    if (window.Telegram && Telegram.WebApp) {
+                        Telegram.WebApp.sendData(timeTaken);
+                        Telegram.WebApp.close();
+                    }
+                    // --- КОНЕЦ БЛОКА ---
                 }
             } else {
                 errorCount++;
@@ -235,33 +244,6 @@
             }
             recordElement.textContent = `Рекорд (${size}x${size}): ${records[size] || "-"} сек`;
         }
-
-        // --- Локальный leaderboard ---
-        function saveLeaderboard(time) {
-            let key = "shulte_leaderboard_" + size + "x" + size + "_lvl" + level;
-            let lb = JSON.parse(localStorage.getItem(key) || "[]");
-            lb.push({name: playerName, time: time});
-            lb.sort((a, b) => a.time - b.time);
-            if (lb.length > 10) lb = lb.slice(0, 10);
-            localStorage.setItem(key, JSON.stringify(lb));
-        }
-
-        function showLeaderboard() {
-            askNameIfNeeded();
-            let key = "shulte_leaderboard_" + document.getElementById('size').value + "x" + document.getElementById('size').value + "_lvl" + document.getElementById('level').value;
-            let lb = JSON.parse(localStorage.getItem(key) || "[]");
-            let html = "<table><tr><th>Место</th><th>Имя</th><th>Время (сек)</th></tr>";
-            for (let i = 0; i < lb.length; i++) {
-                html += `<tr><td>${i+1}</td><td>${lb[i].name}</td><td>${lb[i].time.toFixed(1)}</td></tr>`;
-            }
-            html += "</table>";
-            if (lb.length === 0) html = "<div>Пока нет рекордов.</div>";
-            document.getElementById('leaderboard').innerHTML = html;
-            document.getElementById('leaderboard').style.display = "block";
-        }
-        // --- конец leaderboard ---
-
-        
     </script>
 </body>
 </html>
